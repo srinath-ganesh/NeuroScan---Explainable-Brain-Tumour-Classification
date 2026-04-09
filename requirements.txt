@@ -1,0 +1,23 @@
+# Brain Tumor Classification with SAM - DLCV Project
+# Python 3.8+
+
+# Core
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Scientific stack
+numpy>=1.24.0
+Pillow>=9.5.0
+scikit-learn>=1.2.0
+opencv-python>=4.8.0
+
+# Visualization & evaluation
+matplotlib>=3.7.0
+seaborn>=0.12.0
+tqdm>=4.66.0
+
+# Config (optional YAML)
+PyYAML>=6.0
+
+# Kaggle API for dataset download (optional)
+kaggle>=1.5.0

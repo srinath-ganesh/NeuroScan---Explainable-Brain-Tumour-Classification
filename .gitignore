@@ -1,0 +1,49 @@
+# Data and outputs (keep out of git)
+data/
+outputs/
+TestingData/
+Kaggle_Mega_Test/
+*.zip
+*.pt
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ignore unrelated folders/files (per your note)
+cs418-project-master/
+cs581-f25-group-4-main/
+master_resume.tex
+resume.tex
+
+# Cursor chat exports (local only; do not commit)
+*CursorChat*.md
+*Cursor Chat*.md
+
+# LaTeX build artifacts (but keep .tex if you want)
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
