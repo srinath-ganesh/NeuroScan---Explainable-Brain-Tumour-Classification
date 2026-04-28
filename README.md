@@ -159,6 +159,7 @@ python3 train.py --model efficientnet_b0 --use_sam --rho 0.05 --epochs 30 --batc
 
 Notes:
 - Training prints tqdm progress bars for Train/Val loops.
+- Each epoch also logs validation metrics and a fixed Grad-CAM snapshot set to `outputs/monitoring/`.
 - Checkpoints save to `outputs/checkpoints/` as:
   - `best_efficientnet_b0_baseline.pt`
   - `best_efficientnet_b0_sam.pt`
@@ -168,6 +169,18 @@ If you only want a quick test run:
 ```bash
 python3 train.py --model efficientnet_b0 --epochs 2 --max_batches 50
 ```
+
+### Monitoring dashboard
+
+Start the dashboard to inspect training curves and Grad-CAM snapshots:
+
+```bash
+streamlit run dashboard.py
+```
+
+It reads:
+- `outputs/monitoring/training_history.jsonl`
+- `outputs/monitoring/gradcam_epochs/`
 
 ---
 
@@ -257,17 +270,19 @@ If you want to reproduce exactly, open the notebook and run cells top-to-bottom.
 ## Project layout (core files)
 
 - `config.py` — dataset paths and hyperparameters (epochs, lr, rho, etc.)
+- `monitoring.py` — training history logging and epoch Grad-CAM snapshot helpers
 - `dataset.py` — dataset + deterministic split + dataloaders
 - `transforms.py` — **train vs val/test transforms** (heavy augmentation for train, clean val/test)
 - `models.py` — EfficientNet-B0 / ResNet-50 heads (4-class)
-- `losses.py` — Focal Loss
+- `losses.py` — label-smoothed focal loss blended with cross-entropy
 - `sam.py` — SAM step implementation
-- `train.py` — training entrypoint (baseline + SAM) with tqdm progress bars
+- `train.py` — training entrypoint (baseline + SAM) with tqdm progress bars, metric logging, and Grad-CAM tracking
 - `metrics.py` — evaluation metrics
 - `eval.py` — test-set evaluation (writes JSON/MD)
 - `explainability/gradcam.py` — Grad-CAM
 - `explainability/integrated_gradients.py` — Integrated Gradients
 - `explain.py` — explainability runner over test samples
+- `dashboard.py` — Streamlit monitoring dashboard
 - `inference.py` — single image inference + Grad-CAM
 - `pipeline.py` — single image pipeline (Resize 256 + CenterCrop 224) + Grad-CAM
 - `Execution_Instructions.md` — command-by-command execution notes

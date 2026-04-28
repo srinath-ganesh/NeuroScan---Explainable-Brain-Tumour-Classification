@@ -11,6 +11,9 @@ DATA_DIR = PROJECT_ROOT / "data"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 CHECKPOINTS_DIR = OUTPUTS_DIR / "checkpoints"
 RESULTS_DIR = OUTPUTS_DIR / "results"
+MONITORING_DIR = OUTPUTS_DIR / "monitoring"
+GRADCAM_DIR = MONITORING_DIR / "gradcam_epochs"
+HISTORY_PATH = MONITORING_DIR / "training_history.jsonl"
 
 # Expected data layout after download: data/Brain Tumor MRI Dataset/<class_name>/*.jpg
 # Or: data/<class_name>/*.jpg depending on Kaggle extract structure
@@ -55,7 +58,7 @@ SEED = 42
 
 def ensure_dirs():
     """Create output directories if they don't exist."""
-    for d in (OUTPUTS_DIR, CHECKPOINTS_DIR, RESULTS_DIR):
+    for d in (OUTPUTS_DIR, CHECKPOINTS_DIR, RESULTS_DIR, MONITORING_DIR, GRADCAM_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 

@@ -19,6 +19,7 @@ from dataset import build_dataloaders
 from models import build_model
 from losses import FocalLoss
 from metrics import compute_metrics
+from monitoring import append_jsonl, build_reference_samples, save_gradcam_epoch_snapshot
 from sam import sam_step
 from utils import get_device
 
@@ -61,15 +62,19 @@ def validate(model, val_loader, device):
     model.eval()
     all_preds = []
     all_labels = []
+    all_scores = []
     for x, y in tqdm(val_loader, desc="Val", leave=False):
         x = x.to(device)
         logits = model(x)
         preds = logits.argmax(dim=1).cpu()
+        scores = torch.softmax(logits, dim=1).cpu()
         all_preds.append(preds)
         all_labels.append(y)
+        all_scores.append(scores)
     preds = torch.cat(all_preds)
     labels = torch.cat(all_labels)
-    return compute_metrics(labels.numpy(), preds.numpy(), num_classes=config.NUM_CLASSES)
+    scores = torch.cat(all_scores)
+    return compute_metrics(labels.numpy(), preds.numpy(), scores.numpy(), num_classes=config.NUM_CLASSES)
 
 
 def main():
@@ -81,6 +86,9 @@ def main():
     parser.add_argument("--use_sam", action="store_true")
     parser.add_argument("--rho", type=float, default=None, help="SAM neighborhood radius")
     parser.add_argument("--checkpoint_dir", type=str, default=None)
+    parser.add_argument("--monitor_dir", type=str, default=None, help="Directory for history logs and Grad-CAM snapshots")
+    parser.add_argument("--gradcam_log_every", type=int, default=1, help="Log Grad-CAM snapshots every N epochs")
+    parser.add_argument("--gradcam_samples_per_class", type=int, default=1, help="Number of fixed samples per class for epoch tracking")
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--max_batches", type=int, default=None, help="Max batches per epoch (for quick test)")
     args = parser.parse_args()
@@ -94,6 +102,11 @@ def main():
     batch_size = args.batch_size or config.BATCH_SIZE
     lr = args.lr or config.LEARNING_RATE
     rho = args.rho if args.rho is not None else config.SAM_RHO
+    monitor_dir = Path(args.monitor_dir or config.MONITORING_DIR)
+    gradcam_dir = monitor_dir / "gradcam_epochs"
+    history_path = monitor_dir / "training_history.jsonl"
+    monitor_dir.mkdir(parents=True, exist_ok=True)
+    gradcam_dir.mkdir(parents=True, exist_ok=True)
 
     train_loader, val_loader, _ = build_dataloaders(
         batch_size=batch_size,
@@ -105,6 +118,11 @@ def main():
     model = build_model(args.model, pretrained=True, num_classes=config.NUM_CLASSES).to(device)
     loss_fn = FocalLoss(gamma=config.FOCAL_LOSS_GAMMA, alpha=config.FOCAL_LOSS_ALPHA)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=config.WEIGHT_DECAY)
+    gradcam_probe_samples = build_reference_samples(
+        val_loader,
+        device=device,
+        per_class=max(1, args.gradcam_samples_per_class),
+    )
 
     suffix = "sam" if args.use_sam else "baseline"
     best_f1 = -1.0
@@ -115,7 +133,33 @@ def main():
         )
         metrics = validate(model, val_loader, device)
         val_f1 = metrics["macro_f1"]
-        print(f"Epoch {ep+1}/{epochs}  train_loss={train_loss:.4f}  val_macro_f1={val_f1:.4f}  val_acc={metrics['accuracy']:.4f}")
+        print(
+            f"Epoch {ep+1}/{epochs}  train_loss={train_loss:.4f}  "
+            f"val_macro_f1={val_f1:.4f}  val_acc={metrics['accuracy']:.4f}  "
+            f"val_auroc={metrics.get('auroc', float('nan')):.4f}"
+        )
+
+        gradcam_summary = {}
+        if (ep + 1) % max(1, args.gradcam_log_every) == 0:
+            gradcam_summary = save_gradcam_epoch_snapshot(
+                model=model,
+                samples=gradcam_probe_samples,
+                epoch=ep + 1,
+                model_name=args.model,
+                output_dir=gradcam_dir,
+            )
+
+        history_record = {
+            "epoch": ep + 1,
+            "epochs": epochs,
+            "model": args.model,
+            "use_sam": bool(args.use_sam),
+            "train_loss": float(train_loss),
+            **metrics,
+            **gradcam_summary,
+            "best_so_far": bool(val_f1 > best_f1),
+        }
+        append_jsonl(history_path, history_record)
 
         if val_f1 > best_f1:
             best_f1 = val_f1
@@ -132,6 +176,7 @@ def main():
                     "epochs": epochs,
                     "batch_size": batch_size,
                     "lr": lr,
+                    "monitor_dir": str(monitor_dir),
                 },
             }, ckpt_path)
             print(f"  -> saved {ckpt_path}")
